@@ -5,6 +5,8 @@ import os
 import cv2
 import torch 
 import numpy as np
+import subprocess
+# import torchaudio
 
 
 class MELDDataset(Dataset):
@@ -67,21 +69,65 @@ class MELDDataset(Dataset):
             frames = frames[:30]
 
         return torch.FloatTensor(np.array(frames)).permute(0,3,1,2)
+    
+    def extract_audio_features(self, video_path):
+        audio_path = video_path.replace('.mp4', '.wav')
+        try:
+            subprocess.run([
+                'ffmpeg',
+                '-i', video_path,
+                '-vn',
+                '-acodec', 'pcm_s16le',
+                '-ar', '16000',
+                '-ac', '1',
+                audio_path
+                ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+ 
+            # waveform, sample_rate = torchaudio.load(audio_path)
+
+            # if sample_rate != 16000:
+            #     resampler = torchaudio.transforms.Resample(sample_rate, 16000)
+            #     waveform = resampler(waveform)
+
+            # mel_spectrogram = torchaudio.transforms.MelSpectrogram(
+            #     sample_rate=16000,
+            #     n_fft=1024,
+            #     hop_length=512,
+            #     n_mels=64
+            # )
+
+            # mel_spec = mel_spectrogram(waveform)
+
+            #Normalize the mel spectrogram
+            # mel_spec = (mel_spec - mel_spec.mean())/mel_spec.std()
+
+            # if mel_spec.size(2)< 300:
+            #     padding = 300-mel_spec.size(2) 
+            #     mel_spec = torch.nn.functional.pad(mel_spec, (0, padding))
+            # else:
+            #     mel_spec = mel_spec[:, :, :300]
+        
+        # except subprocess.CalledProcessError as e:
+        #     raise ValueError(f"Error extracting audio from video: {e}")
+        except Exception as e:
+            raise ValueError(f"Error converting video to audio: {e}")
+        # finally:
+        #     if os.path.exists(audio_path):
+        #         os.remove(audio_path)
 
     def __len__(self):
         return len(self.data)
 
     def __getitem__(self, idx):
         row = self.data.iloc[idx]
-        video_filename = f"dia{row['Dialogue_ID']}_utt{
-            row['Utterance_ID']}.mp4"
-        # video_path = os.path.join(self.video_dir, video_filename)
+        video_filename = f"dia{row['Dialogue_ID']}_utt{row['Utterance_ID']}.mp4"
+        video_path = os.path.join(self.video_dir, video_filename)
 
-        path = os.path.join(self.video_dir, video_filename)
-        video_path_exists = os.path.exists(path)
+
+        video_path_exists = os.path.exists(video_path)
 
         if video_path_exists == False:
-            raise FileNotFoundError(f"File {path} not found")
+            raise FileNotFoundError(f"File {video_path} not found")
         
         text_inputs = self.tokenizer(row['Utterance'],
                                     padding="max_length",
@@ -89,8 +135,9 @@ class MELDDataset(Dataset):
                                     max_length=128, 
                                     return_tensors='pt')
         
-        video_frames = self.load_video_frames(path)
-        # print(video_frames)
+        # video_frames = self.load_video_frames(video_path)
+        self.extract_audio_features(video_path)
+        # print(audio_features)
 
 if __name__ == "__main__":
     meld = MELDDataset('../dataset/dev/dev_sent_emo.csv','../dataset/dev/dev_splits_complete')
