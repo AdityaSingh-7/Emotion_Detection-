@@ -140,6 +140,6 @@ class MELDDataset(Dataset):
         print(audio_features)
 
 if __name__ == "__main__":
-    meld = MELDDataset(r'../dataset/dev/dev_sent_emo.csv',r'../dataset/dev/dev_splits_complete')
+    meld = MELDDataset('../dataset/dev/dev_sent_emo.csv','../dataset/dev/dev_splits_complete')
 
     print(meld[0])
